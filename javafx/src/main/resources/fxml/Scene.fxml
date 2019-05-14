@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane id="AnchorPane" prefHeight="106.0" prefWidth="294.0" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8" fx:controller="ru.code23rus.pomodoro.FXMLController">
+    <children>
+        <Button fx:id="buttonWork" layoutX="14.0" layoutY="14.0" onAction="#workAction" text="Работать" />
+        <ProgressBar fx:id="progressBar" layoutX="14.0" layoutY="45.0" prefHeight="25.0" prefWidth="266.0" progress="0.0" />
+        <Label fx:id="labelStatus" layoutX="79.0" layoutY="49.0" minHeight="16" minWidth="69" prefHeight="17.0" prefWidth="137.0" textAlignment="CENTER" />
+    </children>
+</AnchorPane>
