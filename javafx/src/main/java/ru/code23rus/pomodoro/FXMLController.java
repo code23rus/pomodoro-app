@@ -2,23 +2,28 @@ package ru.code23rus.pomodoro;
 
 import java.net.URL;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.Timer;
 import java.util.TimerTask;
 import javafx.application.Platform;
+import javafx.beans.value.ObservableValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Pos;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.image.Image;
+import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
 
 public class FXMLController implements Initializable {
-
-    private final Image idleIcon = new Image(getClass().getResourceAsStream("/icons/idle.png"));
-    private final Image workIcon = new Image(getClass().getResourceAsStream("/icons/work.png"));
 
     @FXML
     private Label labelStatus;
@@ -27,13 +32,22 @@ public class FXMLController implements Initializable {
     private Button buttonWork;
 
     @FXML
-    ProgressBar progressBar;
+    private ProgressBar progressBar;
+
+    @FXML
+    private CheckBox cbPlaySounds;
+
+    @FXML
+    private Canvas canvasActivity;
 
     private boolean inWork;
     private Timer timer;
-    private Stage stage;
-
+    private IconChanger iconChanger;
     private final SoundPlayer player = new SoundPlayer();
+    private boolean playSounds = true;
+    private Storage storage;
+    private Pomodoro activePom;
+    private ActivityChart activityChart;
 
     @FXML
     private void workAction(ActionEvent event) {
@@ -46,34 +60,66 @@ public class FXMLController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle rb) {
+
+        AnchorPane.setLeftAnchor(progressBar, 14d);
+        AnchorPane.setRightAnchor(progressBar, 14d);
+
+        AnchorPane.setLeftAnchor(labelStatus, 20d);
+        AnchorPane.setRightAnchor(labelStatus, 20d);
+        labelStatus.setAlignment(Pos.CENTER);
+
+        // play sounds checkbox change value listener
+        cbPlaySounds.selectedProperty().addListener(
+                (ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) -> {
+            playSounds = newValue;
+        });
+
+        storage = new Storage();
+        activityChart = new ActivityChart(canvasActivity);
+        activityChart.draw(getCurrentDayPoms());
+
         doIdle();
     }
 
     private void doWork() {
         cancelTimers();
         inWork = true;
-        stage.getIcons().setAll(workIcon);
+        setWorkIcon();
         buttonWork.setText("Остановить");
-        player.playWorkStarted();
+        if (playSounds) {
+            player.playWorkStarted();
+        }
+
+        activePom = storage.create();
 
         timer = new Timer("Timer");
         TimerTask task = new TimerTask() {
             private final long timeStart = System.currentTimeMillis();
             private final int workPeriodInSeconds = 25 * 60;
+            private long lastSoundTime = 0;
 
             @Override
             public void run() {
-                long seconds = (System.currentTimeMillis() - timeStart) / 1000;
-                if (inWork && seconds >= workPeriodInSeconds) {
-                    cancel();
-                    doIdle();
-                    return;
+                storage.update(activePom);
+
+                long timeCurrent = System.currentTimeMillis();
+                long seconds = (timeCurrent - timeStart) / 1000;
+                if (seconds > workPeriodInSeconds) { // time is up
+                    if (timeCurrent - lastSoundTime >= 30000) { // play sound to attract attention (not every run)
+                        if (playSounds) {
+                            player.playWorkFinished();
+                        }
+                        lastSoundTime = timeCurrent;
+                    }
+
+                    updateFinishedIcon(); // change the icon to attract attention
                 }
                 LocalTime timeOfDay = LocalTime.ofSecondOfDay(seconds);
                 double progress = (double) seconds / (double) workPeriodInSeconds;
                 Platform.runLater(() -> {
                     labelStatus.setText("Работаем: " + timeOfDay.toString());
                     progressBar.setProgress(progress);
+                    activityChart.draw(getCurrentDayPoms());
                 });
 
             }
@@ -84,10 +130,7 @@ public class FXMLController implements Initializable {
     private void doIdle() {
         cancelTimers();
         inWork = false;
-        if (stage != null) {
-            Platform.runLater(() -> stage.getIcons().setAll(idleIcon));
-            player.playWorkFinished();
-        }
+        setIdleIcon();
         progressBar.setProgress(0);
 
         timer = new Timer();
@@ -98,7 +141,10 @@ public class FXMLController implements Initializable {
             public void run() {
                 long seconds = (System.currentTimeMillis() - timeStart) / 1000;
                 LocalTime timeOfDay = LocalTime.ofSecondOfDay(seconds);
-                Platform.runLater(() -> labelStatus.setText("Отдыхаем: " + timeOfDay.toString()));
+                Platform.runLater(() -> {
+                    labelStatus.setText("Отдыхаем: " + timeOfDay.toString());
+                    activityChart.draw(getCurrentDayPoms());
+                });
             }
         };
         timer.scheduleAtFixedRate(task, 0, 1000);
@@ -112,6 +158,31 @@ public class FXMLController implements Initializable {
     }
 
     void setStage(Stage stage) {
-        this.stage = stage;
+        iconChanger = new IconChanger(stage);
     }
+
+    private void updateFinishedIcon() {
+        if (iconChanger != null) {
+            Platform.runLater(() -> iconChanger.updateFinishedIcon());
+        }
+    }
+
+    private void setWorkIcon() {
+        if (iconChanger != null) {
+            Platform.runLater(() -> iconChanger.setWorkIcon());
+        }
+    }
+
+    private void setIdleIcon() {
+        if (iconChanger != null) {
+            Platform.runLater(() -> iconChanger.setIdleIcon());
+        }
+    }
+
+    private List<Pomodoro> getCurrentDayPoms() {
+        return storage.findInPeriod(
+                Date.from(ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS).toInstant()),
+                Date.from(ZonedDateTime.now().truncatedTo(ChronoUnit.DAYS).plusDays(1).toInstant()));
+    }
+
 }

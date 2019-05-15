@@ -8,7 +8,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
-import javafx.stage.Screen;
 import javafx.stage.Stage;
 
 public class App extends Application {
@@ -34,15 +33,6 @@ public class App extends Application {
 
         FXMLController controller = loader.getController();
         controller.setStage(stage);
-        
-        javafx.geometry.Rectangle2D primaryScreenBounds = Screen.getPrimary().getVisualBounds();
-
-        //set Stage boundaries to visible bounds of the main screen
-        System.out.println("primaryScreenBounds.getWidth() " + primaryScreenBounds.getWidth());
-        System.out.println("primaryScreenBounds.getHeight() " + primaryScreenBounds.getHeight());
-        
-        
-        
     }
 
     /**
